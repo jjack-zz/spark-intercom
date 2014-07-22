@@ -1,0 +1,108 @@
+<html>
+<head>
+<title>remote intercom</title>
+
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+
+<script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+
+<style>
+.button-gigantic {
+    height: 30%;
+    font-size: 90px;
+}
+.humungotext {
+    font-size: 80px;
+    color: #ffffff;
+}
+</style>
+
+<script type="text/javascript">
+var access_token = "929a0f5822fe05cc048f2790ec5b5dd38532d1e2";
+var api_home     = "https://api.spark.io/";
+var api_version  = "v1"; 
+var api_base     = api_home + api_version + "/";
+
+$(function() {
+
+    $("#buzz").click( function() {
+        check_online_and_buzz_in();
+    });
+
+});
+
+function check_online_and_buzz_in () {
+    /* the api takes 30 seconds to time out if the spark isn't online... but that's an eternity of waiting
+       to see if you actually need to get out of bed or not. fortunately, the spark phones home about once
+       a minute. so we spend just a lil bit of time here to find out if it's phoned home w/in the last 90
+       seconds. If it has, assume the spark is currently online and ready to take commands. */
+
+    $("#status").html("checking to see if the spark is online").fadeTo(0, 100);
+
+    $.ajax({
+        type: "GET",
+        url: api_base + "devices/",
+        data: { "access_token" : access_token },
+        success: function ( data ) {
+            var wanted = new Date().getTime() - 90000; 
+            var last_heard;
+
+            // grab this specific spark device from the list of devices
+            $.each( data, function( index, spark_device ) {
+                if ( spark_device["name"] == "intercom" ) {
+                    last_heard = new Date(spark_device['last_heard']).getTime();
+                    return;         
+                }
+            });
+
+            if ( last_heard >= wanted ) {
+                buzz_in();
+            } else {
+                $("#status").html("NOT ONLINE.<br/>GO DOWNSTAIRS").fadeTo(30000, 0);
+                alert("You need to get out of bed and go downstairs.");
+            }
+        }, 
+    });
+}
+
+function buzz_in () {
+    /* actually send the command to press the buzzer for 6 seconds. also time out if nothing's happened
+       in 10 seconds so that we don't have to wait the full 30 for the api to automatically bail. */
+
+    $("#status").html("sending buzz command").fadeTo(0, 100);
+
+    $.ajax({
+        type: "POST",
+        url: api_base + "devices/intercom/buzz",
+        data: { "access_token" : access_token },
+        timeout: 10000,
+        success: function ( data ) {
+            $("#status").html("BUZZED IN!").fadeTo(4000, 0);
+        },
+        error: function ( xhr, data ) {
+            $("#status").html("NOT BUZZED.<br/>GO DOWNSTAIRS").fadeTo(30000, 0);
+            alert("ERROR: " + data + "\n\nYou need to get out of bed and go downstairs.");
+        },
+    });
+}
+
+</script>
+
+</head>
+
+<body style="background-color:#222222">
+
+  <table class="table" height="100%">
+    <tr>
+      <td style="vertical-align:middle">
+        <h1 id="status" class="humungotext" align="center">&nbsp;</h1>
+        <br>
+        <button type="button" class="btn btn-warning btn-block btn-lg button-gigantic" id="buzz">Let Them In!</button>
+      </td>
+      </tr>
+   </table>
+
+</body>
+
+</html>
